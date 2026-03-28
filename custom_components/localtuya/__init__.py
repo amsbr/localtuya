@@ -269,6 +269,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         platforms = platforms.union(
             set(entity[CONF_PLATFORM] for entity in entities)
         )
+        if dev_id in hass.data[DOMAIN][TUYA_DEVICES]:
+            await hass.data[DOMAIN][TUYA_DEVICES][dev_id].close()
         hass.data[DOMAIN][TUYA_DEVICES][dev_id] = TuyaDevice(hass, entry, dev_id)
 
     # Setup all platforms at once, letting HA handling each platform and avoiding
@@ -308,13 +310,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     hass.data[DOMAIN][entry.entry_id][UNSUB_LISTENER]()
     for dev_id, device in hass.data[DOMAIN][TUYA_DEVICES].items():
-        if device.connected:
-            await device.close()
+        await device.close()
 
-    if unload_ok:
-        hass.data[DOMAIN][TUYA_DEVICES] = {}
+    hass.data[DOMAIN][TUYA_DEVICES] = {}
 
-    return True
+    return unload_ok
 
 
 async def update_listener(hass, config_entry):
