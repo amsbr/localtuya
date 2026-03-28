@@ -7,7 +7,7 @@ from datetime import timedelta
 import homeassistant.helpers.config_validation as cv
 import homeassistant.helpers.entity_registry as er
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import (
     CONF_CLIENT_ID,
     CONF_CLIENT_SECRET,
@@ -104,7 +104,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
         # If device is not in cache, check if a config entry exists
         entry = async_config_entry_by_device_id(hass, device_id)
-        if entry is None:
+        if entry is None or entry.state != ConfigEntryState.LOADED:
             return
 
         if device_id not in device_cache:
@@ -147,7 +147,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
         device = hass.data[DOMAIN][TUYA_DEVICES].get(device_id)
         if not device:
             _LOGGER.warning(f"Could not find device for device_id {device_id}")
-        elif not device.connected:
+        elif device and not device.connected:
             device.async_connect()
 
 
