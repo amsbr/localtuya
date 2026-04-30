@@ -7,7 +7,7 @@ from datetime import timedelta
 import homeassistant.helpers.config_validation as cv
 import homeassistant.helpers.entity_registry as er
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_CLIENT_ID,
     CONF_CLIENT_SECRET,
@@ -104,7 +104,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
         # If device is not in cache, check if a config entry exists
         entry = async_config_entry_by_device_id(hass, device_id)
-        if entry is None or entry.state != ConfigEntryState.LOADED:
+        if entry is None:
             return
 
         if device_id not in device_cache:
@@ -147,7 +147,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
         device = hass.data[DOMAIN][TUYA_DEVICES].get(device_id)
         if not device:
             _LOGGER.warning(f"Could not find device for device_id {device_id}")
-        elif device and not device.connected:
+        elif not device.connected:
             device.async_connect()
 
 
@@ -269,8 +269,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         platforms = platforms.union(
             set(entity[CONF_PLATFORM] for entity in entities)
         )
-        if dev_id in hass.data[DOMAIN][TUYA_DEVICES]:
-            await hass.data[DOMAIN][TUYA_DEVICES][dev_id].close()
         hass.data[DOMAIN][TUYA_DEVICES][dev_id] = TuyaDevice(hass, entry, dev_id)
 
     # Setup all platforms at once, letting HA handling each platform and avoiding
@@ -310,11 +308,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     hass.data[DOMAIN][entry.entry_id][UNSUB_LISTENER]()
     for dev_id, device in hass.data[DOMAIN][TUYA_DEVICES].items():
-        await device.close()
+        if device.connected:
+            await device.close()
 
-    hass.data[DOMAIN][TUYA_DEVICES] = {}
+    if unload_ok:
+        hass.data[DOMAIN][TUYA_DEVICES] = {}
 
-    return unload_ok
+    return True
 
 
 async def update_listener(hass, config_entry):

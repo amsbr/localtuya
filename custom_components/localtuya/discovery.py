@@ -25,6 +25,9 @@ def decrypt_udp(message):
     def _unpad(data):
         return data[: -ord(data[len(data) - 1 :])]
 
+    if len(message) % 16 != 0:
+        raise ValueError(f"Data length {len(message)} is not a multiple of 16")
+
     cipher = Cipher(algorithms.AES(UDP_KEY), modes.ECB(), default_backend())
     decryptor = cipher.decryptor()
     return _unpad(decryptor.update(message) + decryptor.finalize()).decode()
@@ -64,9 +67,18 @@ class TuyaDiscovery(asyncio.DatagramProtocol):
         try:
             data = decrypt_udp(data)
         except Exception:  # pylint: disable=broad-except
-            data = data.decode()
+            try:
+                data = data.decode()
+            except UnicodeDecodeError:
+                _LOGGER.debug("Ignoring non-decodable UDP broadcast from %s", addr)
+                return
 
-        decoded = json.loads(data)
+        try:
+            decoded = json.loads(data)
+        except json.JSONDecodeError:
+            _LOGGER.debug("Ignoring non-JSON UDP broadcast from %s", addr)
+            return
+
         self.device_found(decoded)
 
     def device_found(self, device):
